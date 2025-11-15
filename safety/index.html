@@ -1,0 +1,268 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>SOS Tracker — Full</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body{font-family:Inter,Arial;background:linear-gradient(180deg,#071423,#0b1220);color:#e6eef6;margin:0;height:100vh;display:flex;flex-direction:column;}
+    header{padding:12px;display:flex;justify-content:space-between;align-items:center;}
+    .controls{display:flex;gap:12px;align-items:center;}
+    .sos{width:110px;height:110px;border-radius:999px;background:radial-gradient(circle,#ff6b6b,#ef4444);border:none;color:#fff;font-weight:700;font-size:20px;cursor:pointer;}
+    .btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;}
+    .mapwrap{flex:1;padding:12px;}
+    #map{height:100%;border-radius:10px;}
+    #aiChat{position:fixed;right:20px;bottom:20px;width:340px;background:#081226;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,0.6);display:flex;flex-direction:column;overflow:hidden;display:none;}
+    #aiHeader{padding:10px;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.04);}
+    #aiMsgs{padding:10px;height:260px;overflow:auto;font-size:14px;}
+    #aiInputWrap{display:flex;border-top:1px solid rgba(255,255,255,0.04);}
+    #aiInput{flex:1;padding:10px;border:none;background:transparent;color:inherit;}
+    #policeList{max-height:140px;overflow:auto;padding:8px;background:rgba(255,255,255,0.02);border-radius:8px;margin-top:8px;display:none;}
+  </style>
+</head>
+<body>
+  <header>
+    <div style="font-weight:700;font-size:18px">SOS Tracker — AI + Alerts</div>
+    <div class="controls">
+      <button id="aiOpen" class="btn" style="background:#3b82f6;color:#fff;">AI</button>
+      <button id="policeBtn" class="btn" style="background:#10b981;color:#fff;">Find Police Nearby</button>
+    </div>
+  </header>
+
+  <div style="display:flex;gap:12px;padding:12px;align-items:center;">
+    <button id="sosBtn" class="sos">SOS</button>
+    <div>
+      <div style="font-weight:700">Passphrase</div>
+      <div id="passPreview" style="color:#9aa4b2">Not set</div>
+      <div style="margin-top:8px;">
+        <button id="trackBtn" class="btn" style="background:#059669;color:#fff;display:none;">Start Tracking</button>
+        <button id="sendAlertBtn" class="btn" style="background:#ef4444;color:#fff;display:none;">Send Alert</button>
+        <button id="alarmBtn" class="btn" style="background:#f59e0b;color:#000;">Alarm</button>
+      </div>
+      <div id="status" style="margin-top:8px;color:#9aa4b2">Idle</div>
+    </div>
+    <div style="margin-left:auto;color:#9aa4b2;text-align:right;">
+      <div id="telemetry">Location: unknown</div>
+      <div id="shareLink"></div>
+    </div>
+  </div>
+
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div id="policeList"></div>
+  </div>
+
+  <!-- AI Chat -->
+  <div id="aiChat">
+    <div id="aiHeader">AI Assistant</div>
+    <div id="aiMsgs"></div>
+    <div id="aiInputWrap">
+      <input id="aiInput" placeholder="How can I help?" />
+      <button id="aiSend" class="btn" style="background:#ef4444;color:#fff;">Send</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  // CONFIG - change to your backend origin
+  const SERVER_ORIGIN = 'http://localhost:3000';
+
+  // UI elements
+  const sosBtn = document.getElementById('sosBtn');
+  const passPreview = document.getElementById('passPreview');
+  const trackBtn = document.getElementById('trackBtn');
+  const sendAlertBtn = document.getElementById('sendAlertBtn');
+  const statusEl = document.getElementById('status');
+  const telemetry = document.getElementById('telemetry');
+  const aiOpen = document.getElementById('aiOpen');
+  const aiChat = document.getElementById('aiChat');
+  const aiMsgs = document.getElementById('aiMsgs');
+  const aiInput = document.getElementById('aiInput');
+  const aiSend = document.getElementById('aiSend');
+  const alarmBtn = document.getElementById('alarmBtn');
+  const policeBtn = document.getElementById('policeBtn');
+  const policeList = document.getElementById('policeList');
+
+  let passphrase = null;
+  let map, marker, watchId;
+
+  function initMap(){
+    map = L.map('map').setView([20.5937,78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19 }).addTo(map);
+  }
+  initMap();
+
+  sosBtn.addEventListener('click', ()=>{
+    const p = prompt('Enter a unique SOS passphrase (this will be used to verify you before tracking):');
+    if(!p) return alert('passphrase required');
+    passphrase = p.trim();
+    passPreview.textContent = 'Passphrase: ' + (passphrase.length>20 ? passphrase.slice(0,20)+'…' : passphrase);
+    trackBtn.style.display = 'inline-block';
+    sendAlertBtn.style.display = 'inline-block';
+    statusEl.textContent = 'SOS configured';
+  });
+
+  trackBtn.addEventListener('click', ()=>{
+    if(!passphrase) return alert('Set SOS passphrase first');
+    if(watchId){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      trackBtn.textContent = 'Start Tracking';
+      statusEl.textContent = 'Tracking stopped';
+      return;
+    }
+    const re = prompt('Enter passphrase to start tracking:');
+    if(!re || re.trim() !== passphrase) return alert('passphrase mismatch');
+    trackBtn.textContent = 'Stop Tracking';
+    statusEl.textContent = 'Tracking...';
+    watchId = navigator.geolocation.watchPosition(async pos=>{
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      telemetry.textContent = `Lat ${lat.toFixed(6)}, Lng ${lng.toFixed(6)}, acc ${Math.round(accuracy)}m`;
+      if(!marker) marker = L.marker([lat,lng]).addTo(map);
+      else marker.setLatLng([lat,lng]);
+      map.setView([lat,lng], 16);
+      fetch(SERVER_ORIGIN + '/track', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ passphrase, timestamp:new Date().toISOString(), coords:{lat,lng,accuracy}, userAgent:navigator.userAgent })
+      }).catch(e => console.warn('POST track failed', e));
+      document.getElementById('shareLink').innerHTML = `<a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}" style="color:#9aa4b2">Share</a>`;
+    }, err => {
+      console.warn(err);
+      alert('Location error: ' + (err.message || err.code));
+    }, { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
+  });
+
+  sendAlertBtn.addEventListener('click', async ()=>{
+    if(!passphrase) return alert('Set SOS first');
+    const note = prompt('Optional note to include in alert (e.g., "I am being followed")');
+    const coords = marker ? marker.getLatLng() : null;
+    const ok = confirm('Send emergency alert to your configured contacts now?');
+    if(!ok) return;
+    statusEl.textContent = 'Sending alert...';
+    try {
+      const res = await fetch(SERVER_ORIGIN + '/send-alert', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ passphrase, note, lat: coords?.lat, lng: coords?.lng })
+      });
+      const j = await res.json();
+      statusEl.textContent = 'Alert sent';
+      alert('Alert endpoint responded: ' + (j.status || JSON.stringify(j)));
+    } catch(err){
+      console.error(err);
+      alert('Failed to send alert: ' + err.message);
+      statusEl.textContent = 'Alert send failed';
+    }
+  });
+
+  aiOpen.addEventListener('click', ()=> aiChat.style.display = aiChat.style.display === 'flex' ? 'none' : 'flex');
+
+  aiSend.addEventListener('click', sendAiMessage);
+  aiInput.addEventListener('keypress', (e)=> { if(e.key==='Enter') sendAiMessage(); });
+
+  async function sendAiMessage(){
+    const text = aiInput.value.trim();
+    if(!text) return;
+    aiMsgs.innerHTML += `<div style="color:#9aa4b2"><b>You:</b> ${escapeHtml(text)}</div>`;
+    aiInput.value = '';
+    aiMsgs.scrollTop = aiMsgs.scrollHeight;
+    try {
+      const res = await fetch(SERVER_ORIGIN + '/ai-chat', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ message: text, history: [] })
+      });
+      const j = await res.json();
+      const reply = j.reply || j.error || 'No reply';
+      aiMsgs.innerHTML += `<div style="margin-top:6px;"><b>AI:</b> ${escapeHtml(reply)}</div>`;
+      aiMsgs.scrollTop = aiMsgs.scrollHeight;
+    } catch(err){
+      console.error(err);
+      aiMsgs.innerHTML += `<div style="color:#fca5a5"><b>AI Error:</b> ${escapeHtml(err.message || String(err))}</div>`;
+    }
+  }
+
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'<','>':'>','"':'&quot;',"'":"&#39;"}[c])); }
+
+  // Alarm sound + flashlight fallback
+  alarmBtn.addEventListener('click', async () => {
+    playBeepSequence();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }});
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+      if (capabilities.torch) {
+        await track.applyConstraints({ advanced: [{ torch: true }] });
+        statusEl.textContent = 'Flashlight ON (auto-off after 10s).';
+        setTimeout(()=>{ try{ track.applyConstraints({ advanced:[{ torch:false }]}); track.stop(); }catch(e){} }, 10000);
+      } else {
+        flashScreen();
+        track.stop();
+      }
+    } catch (err) {
+      console.warn('Torch not available', err);
+      flashScreen();
+    }
+  });
+
+  function playBeepSequence(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      let t = ctx.currentTime;
+      const freqs = [880, 660, 880, 660];
+      freqs.forEach((f, i)=>{
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = f;
+        o.connect(g);
+        g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.0001, t + i*0.3);
+        g.gain.exponentialRampToValueAtTime(0.3, t + i*0.3 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + i*0.3 + 0.28);
+        o.start(t + i*0.3);
+        o.stop(t + i*0.3 + 0.3);
+      });
+    } catch(e){ console.warn('Audio API not available', e); }
+  }
+
+  function flashScreen(){
+    const flash = document.createElement('div');
+    flash.style.position='fixed';
+    flash.style.inset='0';
+    flash.style.background='#fff';
+    flash.style.opacity='1';
+    flash.style.zIndex=999999;
+    document.body.appendChild(flash);
+    setTimeout(()=>{ flash.style.transition='opacity 400ms'; flash.style.opacity='0'; setTimeout(()=>flash.remove(),450); }, 300);
+  }
+
+  // Find police nearby using backend Overpass proxy
+  policeBtn.addEventListener('click', async ()=>{
+    if(!marker) return alert('Allow location / start tracking first so we can find nearby police stations.');
+    const latlng = marker.getLatLng();
+    policeList.style.display = 'block';
+    policeList.innerHTML = 'Searching nearby police stations...';
+    try {
+      const res = await fetch(`${SERVER_ORIGIN}/nearby-police?lat=${latlng.lat}&lon=${latlng.lng}&radius=3000`);
+      const j = await res.json();
+      if(!j.elements || j.elements.length===0){ policeList.innerHTML = 'No police stations found nearby.'; return; }
+      policeList.innerHTML = '';
+      j.elements.slice(0,20).forEach(el=>{
+        const name = el.tags?.name || 'Police station';
+        const lat = el.lat || el.center?.lat;
+        const lon = el.lon || el.center?.lon;
+        const a = document.createElement('div');
+        a.innerHTML = `<b>${escapeHtml(name)}</b><div style="font-size:13px;color:#9aa4b2">${lat?.toFixed(6)}, ${lon?.toFixed(6)} <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}" target="_blank" style="color:#9aa4b2">Open</a></div>`;
+        policeList.appendChild(a);
+      });
+    } catch(err){
+      console.error(err);
+      policeList.innerHTML = 'Error finding police stations: ' + err.message;
+    }
+  });
+  </script>
+</body>
+</html>

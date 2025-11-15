@@ -1,0 +1,14 @@
+{
+  "name": "sos-app",
+  "version": "1.0.0",
+  "description": "SOS Tracking App",
+  "scripts": {
+    "start": "concurrently \"npm run start:server\" \"npm run start:client\"",
+    "start:server": "cd server && node server.js",
+    "start:client": "npx serve client"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "serve": "^14.2.1"
+  }
+}
