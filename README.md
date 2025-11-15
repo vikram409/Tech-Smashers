@@ -21,7 +21,7 @@ Fastest Route (Red)
 Safest Route (Green)
 This helps users make safer travel decisions.
 
-Phase 4 – Deepfake Driver & Vehicle Verification
+Phase 4 – Deepfake Driver & Vehicle Verification(Squareroots.ai)
 
 Before entering a cab or ride, users can scan the driver’s face or ID card. A deepfake detection model analyzes facial patterns to verify authenticity and detect manipulated images. This prevents fake driver identity fraud and enhances passenger safety.
 
@@ -49,7 +49,7 @@ Improves overall road quality and maintenance planning
 Creates a reliable and continuous monitoring system
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
-Phase 4 – Deepfake Driver & Vehicle Verification
+Phase 4 – Deepfake Driver & Vehicle Verification(Squareroots.ai)
 
 Phase 4 focuses on ensuring safe and trusted travel by verifying the driver’s identity and vehicle authenticity using deepfake detection technology. Before entering a cab or ride, users can simply scan the driver’s face, ID card, or vehicle information through the app. The system then analyzes the input using a trained deepfake detection model that checks for abnormal facial patterns, inconsistencies, or digital manipulation. This helps identify whether the driver is genuine or if the image has been tampered with.
 
