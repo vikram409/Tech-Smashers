@@ -100,6 +100,7 @@ Provides a visual map with color-coded route options
 Encourages authorities to maintain frequently marked unsafe areas
 
 This phase makes navigation smarter by combining mobility, safety, and real-time environmental insights.
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Phase 4 – Deepfake Driver & Vehicle Verification(Squareroots.ai)
 
