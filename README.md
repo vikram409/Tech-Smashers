@@ -47,3 +47,26 @@ Encourages public participation through crowdsourced reporting
 Improves overall road quality and maintenance planning
 
 Creates a reliable and continuous monitoring system
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Phase 4 – Deepfake Driver & Vehicle Verification
+
+Phase 4 focuses on ensuring safe and trusted travel by verifying the driver’s identity and vehicle authenticity using deepfake detection technology. Before entering a cab or ride, users can simply scan the driver’s face, ID card, or vehicle information through the app. The system then analyzes the input using a trained deepfake detection model that checks for abnormal facial patterns, inconsistencies, or digital manipulation. This helps identify whether the driver is genuine or if the image has been tampered with.
+
+The system uses advanced AI techniques to look for signs of face swapping, morphing, masking, altered lighting patterns, and unrealistic facial movements. If the model detects any suspicious activity, the user receives an instant alert warning them of potential identity fraud. Verified drivers are marked as safe, giving passengers confidence before boarding the vehicle.
+
+Benefits
+
+Prevents fake-driver scams and identity fraud
+
+Protects passengers from impersonation-based crimes
+
+Ensures only verified and trusted drivers are allowed
+
+Increases overall safety for women, students, and solo travelers
+
+Helps authorities track identity-related violations
+
+Builds public trust in the transportation system
+
+This phase adds an essential security layer, making rides safer by ensuring that every driver and vehicle is authentic.
