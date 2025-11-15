@@ -1,0 +1,48 @@
+# Core Python Utilities
+numpy
+pandas
+matplotlib
+requests
+tqdm
+
+# Machine Learning / Deep Learning
+torch
+torchvision
+ultralytics          # YOLO models
+opencv-python        # Image processing
+scikit-image
+scikit-learn
+
+# Deepfake Detection / Face Verification
+facenet-pytorch
+mtcnn
+insightface
+tensorflow           # If needed for deepfake classifier
+
+# FastAPI / Flask (choose based on your backend)
+fastapi
+uvicorn
+flask
+
+# Geolocation / Mapping
+geopy
+folium               # For safe route maps
+osmnx                # Street network data
+networkx
+leafmap              # Optional for map visualization
+
+# Background Services / Safety Features
+twilio               # SMS alerts
+pyttsx3              # Offline voice alerts
+pydantic
+
+# Image & File Handling
+Pillow
+python-multipart
+
+# Database (only if needed)
+pymongo
+sqlalchemy
+
+# Utility / Extra
+python-dotenv        # Load .env files
