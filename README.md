@@ -25,8 +25,6 @@ Phase 4 – Deepfake Driver & Vehicle Verification(Squareroots.ai)
 
 Before entering a cab or ride, users can scan the driver’s face or ID card. A deepfake detection model analyzes facial patterns to verify authenticity and detect manipulated images. This prevents fake driver identity fraud and enhances passenger safety.
 
-
-
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Phase 1 – Automatic Road Damage Detection(Squareroots.ai)
 
@@ -48,7 +46,61 @@ Improves overall road quality and maintenance planning
 
 Creates a reliable and continuous monitoring system
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Phase 2 – Women Safety & SOS Monitoring
+
+Phase 2 focuses on providing fast and reliable safety support for women during emergencies. Users can activate SOS Mode through a single button or a voice command whenever they feel unsafe. Once SOS Mode is triggered, the app immediately starts sending the user’s live location every 10 seconds to police or guardian dashboards through a secure API.
+
+An AI-assisted call is also initiated to stay connected with the user and monitor her condition until she reaches a safe place. The system keeps tracking the user continuously, and the SOS mode can only be turned off after an identity verification step. This prevents others from forcefully disabling the safety feature.
+
+In addition to live tracking, the system sends emergency SMS alerts to registered contacts, containing the user’s location and a short emergency message. This ensures that help can arrive even if the user’s internet access is weak or unavailable.
+
+Benefits
+
+Provides quick emergency support with live tracking
+
+Ensures continuous monitoring through AI-assisted calls
+
+Prevents forced shutdown of SOS mode with identity verification
+
+Sends alerts to police, guardians, and emergency contacts
+
+Enhances safety for women traveling alone or at night
+
+Helps authorities respond faster and more accurately
+
+This phase creates a strong, real-time safety mechanism for women in critical situations.
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Phase 3 – Safe Route Recommendation
+
+Phase 3 focuses on improving travel safety by recommending routes that are not only fast, but also safe. Unlike traditional navigation apps that prioritize the shortest or quickest paths, this system calculates a Safety Score for every road segment. The score is based on multiple real-world factors such as detected potholes, road cracks, lighting conditions, hazard frequency, and crime-zone data. This ensures that users receive navigation information that prioritizes their safety rather than just speed.
+
+The application uses OpenStreetMap as the mapping source and Leaflet.js for interactive map rendering. After evaluating all routes, the app displays two clear options:
+
+Fastest Route (Red) – The traditional fastest path
+
+Safest Route (Green) – The route with the highest safety rating
+
+By comparing these routes, users can make informed travel decisions based on their personal preferences and safety needs.
+
+Benefits
+
+Helps users choose safer routes during day or night
+
+Avoids accident-prone or poorly maintained roads
+
+Reduces risks for women, students, and solo travelers
+
+Uses real hazard and crime data for accurate scoring
+
+Provides a visual map with color-coded route options
+
+Encourages authorities to maintain frequently marked unsafe areas
+
+This phase makes navigation smarter by combining mobility, safety, and real-time environmental insights.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Phase 4 – Deepfake Driver & Vehicle Verification(Squareroots.ai)
 
 Phase 4 focuses on ensuring safe and trusted travel by verifying the driver’s identity and vehicle authenticity using deepfake detection technology. Before entering a cab or ride, users can simply scan the driver’s face, ID card, or vehicle information through the app. The system then analyzes the input using a trained deepfake detection model that checks for abnormal facial patterns, inconsistencies, or digital manipulation. This helps identify whether the driver is genuine or if the image has been tampered with.
