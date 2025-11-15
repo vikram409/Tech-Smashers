@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Safe Route Finder — Combined</title>
+
+<!-- Tailwind for UI -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+  body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: #f8fafc }
+  #map { height: 58vh; border-radius: .5rem; }
+  .route-info{ transition: all .2s }
+  .highlight { border-left: 4px solid }
+  .suggestion { cursor:pointer; padding:.45rem; border-bottom:1px solid #eee }
+  .suggestion:hover { background:#eef2ff }
+  #directions { max-height: 40vh; overflow:auto; }
+  .step { padding:.5rem; border-bottom: 1px solid #eee; cursor:pointer }
+  .step.active { background: #eef2ff }
+  .small{ font-size: .85rem; color:#374151 }
+  .traffic-marker { background: rgba(255,165,0,0.85); padding: 4px 6px; border-radius: 4px; color: #000; font-weight:600; }
+  .police-marker { background: rgba(255,0,0,0.85); padding: 4px 6px; border-radius: 4px; color: #fff; font-weight:600; }
+</style>
+</head>
+<body class="p-4 md:p-8">
+
+  <header class="mb-4">
+    <h1 class="text-2xl font-bold">Safe Route Finder — Combined</h1>
+    <p class="text-sm text-slate-600">Fastest & Safest route, turn-by-turn directions, live traffic & police overlays, distance matrix.</p>
+  </header>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Controls -->
+    <aside class="lg:col-span-1 bg-white rounded-xl p-4 shadow">
+      <label class="block text-sm font-medium">Routing Provider</label>
+      <select id="routerSelect" class="mt-1 w-full rounded border p-2">
+        <option value="osrm">OSRM (public)</option>
+        <option value="ors">OpenRouteService (ORS - API key via proxy)</option>
+      </select>
+
+      <label class="block text-sm font-medium mt-3">Start</label>
+      <div class="flex gap-2">
+        <input id="start" class="mt-1 mb-1 w-full rounded border p-2" placeholder="Start (e.g., Hitech City, Hyderabad)" />
+        <button id="voiceStart" class="mt-1 px-3 rounded bg-indigo-100">🎤</button>
+        <button id="gpsStart" class="mt-1 px-3 rounded bg-indigo-100">📍</button>
+      </div>
+      <div id="startSuggestions" class="bg-white border rounded max-h-40 overflow-auto mt-1"></div>
+
+      <label class="block text-sm font-medium mt-3">Destination</label>
+      <input id="end" class="mt-1 mb-1 w-full rounded border p-2" placeholder="Destination (e.g., Kukatpally)" />
+      <div id="endSuggestions" class="bg-white border rounded max-h-40 overflow-auto mt-1"></div>
+
+      <label class="block text-sm font-medium mt-3">Image (optional)</label>
+      <input id="placeImage" type="file" accept="image/*" class="mt-1" />
+      <div id="imagePreview" class="mt-2"></div>
+
+      <button id="findBtn" class="mt-4 w-full bg-indigo-600 text-white py-2 rounded">Find Routes</button>
+
+      <div class="mt-4 border-t pt-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xs text-slate-500">SOS</div>
+            <div id="sosStatus" class="font-bold text-red-600">INACTIVE</div>
+          </div>
+          <button id="toggleSos" class="px-3 py-1 rounded bg-red-500 text-white">Toggle SOS</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <h3 class="font-semibold">Distance Matrix</h3>
+        <div id="distanceMatrix" class="mt-2 text-sm text-slate-700">No results yet.</div>
+      </div>
+
+      <div class="mt-4">
+        <h3 class="font-semibold">Recent Searches</h3>
+        <div id="recentBox" class="mt-2 text-sm"></div>
+      </div>
+    </aside>
+
+    <!-- Map + overlays -->
+    <section class="lg:col-span-2 bg-white rounded-xl p-4 shadow">
+      <div id="map"></div>
+
+      <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <h3 class="font-semibold">Route Comparison</h3>
+          <div id="routeA_info" class="route-info mt-2 p-2 border rounded cursor-pointer" data-color="red">
+            <div class="font-semibold text-red-600">Route A (Fastest)</div>
+            <div id="routeA_details" class="text-xs text-slate-600">Not calculated yet</div>
+          </div>
+          <div id="routeB_info" class="route-info mt-2 p-2 border rounded cursor-pointer" data-color="green">
+            <div class="font-semibold text-green-600">Route B (Safest)</div>
+            <div id="routeB_details" class="text-xs text-slate-600">Not calculated yet</div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="font-semibold">Turn-by-Turn</h3>
+          <div id="directions" class="mt-2 border rounded p-2 text-sm">No directions yet</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+    <div class="bg-white rounded p-4 w-full max-w-lg">
+      <h3 id="modalTitle" class="font-bold"></h3>
+      <div id="modalBody" class="mt-2 text-sm"></div>
+      <div class="mt-4 text-right">
+        <button id="modalClose" class="px-3 py-1 bg-indigo-600 text-white rounded">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/*
+  Combined Safe Route Finder
+  - OSRM routing (alternatives)
+  - Nominatim autocomplete (client)
+  - Safest vs Fastest selection (scoring)
+  - Turn-by-turn directions (steps) with clickable steps
+  - Distance matrix (from route legs)
+  - Image-based low-light hazard hint
+  - Live overlays: fetch from /api/traffic and /api/police (server proxy)
+  Notes:
+   - You MUST implement /api/traffic and /api/police in your backend to keep keys secret.
+   - ORS option: change routerSelect to 'ors' and call your server proxy /api/ors for routing.
+*/
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Config
+  const OSRM_BASE = 'https://router.project-osrm.org';
+  const TRAFFIC_PROXY = '/api/traffic';   // <-- server endpoint to fetch live traffic (must implement)
+  const POLICE_PROXY = '/api/police';     // <-- server endpoint to fetch police reports / safety
+  const ORS_PROXY = '/api/ors-route';     // <-- optional server endpoint for ORS if selected
+
+  // Elements
+  const startInput = document.getElementById('start');
+  const endInput = document.getElementById('end');
+  const startSug = document.getElementById('startSuggestions');
+  const endSug = document.getElementById('endSuggestions');
+  const findBtn = document.getElementById('findBtn');
+  const placeImage = document.getElementById('placeImage');
+  const imagePreview = document.getElementById('imagePreview');
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalBody = document.getElementById('modalBody');
+  const modalClose = document.getElementById('modalClose');
+  const sosStatus = document.getElementById('sosStatus');
+  const toggleSos = document.getElementById('toggleSos');
+  const directionsDiv = document.getElementById('directions');
+  const routeA_details = document.getElementById('routeA_details');
+  const routeB_details = document.getElementById('routeB_details');
+  const routeA_info = document.getElementById('routeA_info');
+  const routeB_info = document.getElementById('routeB_info');
+  const distanceMatrixDiv = document.getElementById('distanceMatrix');
+  const routerSelect = document.getElementById('routerSelect');
+  const recentBox = document.getElementById('recentBox');
+  const voiceStart = document.getElementById('voiceStart');
+  const gpsStart = document.getElementById('gpsStart');
+
+  // caches
+  const cache = new Map(); // display_name -> [lat, lon]
+  let trafficLayerMarkers = []; // markers for traffic
+  let policeLayerMarkers = [];  // markers for police
+
+  // Map
+  const map = L.map('map').setView([17.385, 78.486], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+
+  // Mock hazards (potholes + unsafe zones)
+  const HAZARDS = {
+    potholes: [ [17.398,78.475], [17.390,78.477], [17.388,78.485], [17.382,78.490], [17.386,78.498] ],
+    unsafeZones: [ {lat:17.395,lng:78.480,weight:10,radius:400}, {lat:17.390,lng:78.488,weight:5,radius:250}, {lat:17.385,lng:78.478,weight:10,radius:500} ]
+  };
+  HAZARDS.potholes.forEach(p => L.circleMarker(p,{radius:5,color:'blue',fill:true}).addTo(map));
+  HAZARDS.unsafeZones.forEach(z => L.circle([z.lat,z.lng],{radius:z.radius,color:'rgba(255,0,0,0.3)',fill:true}).addTo(map));
+
+  // route layers
+  let routeLayers = [];
+  function clearRoutes(){ routeLayers.forEach(l => map.removeLayer(l)); routeLayers = []; }
+  function drawRoute(points, color, opts = {}) {
+    if(!points || !Array.isArray(points) || points.length === 0) return null;
+    const poly = L.polyline(points, { color, weight: 6, opacity: opts.opacity || 0.95 }).addTo(map);
+    routeLayers.push(poly);
+    return poly;
+  }
+
+  // modal
+  function showModal(title, body){ modalTitle.innerHTML = title; modalBody.innerHTML = body; modal.classList.remove('hidden'); modal.classList.add('flex'); }
+  function closeModal(){ modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  modalClose.addEventListener('click', closeModal);
+
+  // geocode (Nominatim limit=7 for suggestions, limit=1 for single geopoint)
+  async function geocodeOne(query){
+    try{
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+      const r = await fetch(url);
+      if(!r.ok) return null;
+      const j = await r.json();
+      if(!j || j.length === 0) return null;
+      const lat = parseFloat(j[0].lat), lon = parseFloat(j[0].lon);
+      cache.set(j[0].display_name, [lat, lon]);
+      return [lat, lon, j[0].display_name];
+    }catch(e){ console.warn('geocodeOne failed', e); return null; }
+  }
+
+  // suggestions
+  let sTimer = null, eTimer = null;
+  startInput.addEventListener('input', ()=> { clearTimeout(sTimer); sTimer = setTimeout(()=> fetchSuggest(startInput.value, startSug), 250); });
+  endInput.addEventListener('input', ()=> { clearTimeout(eTimer); eTimer = setTimeout(()=> fetchSuggest(endInput.value, endSug), 250); });
+
+  async function fetchSuggest(q, container){
+    container.innerHTML = '';
+    if(!q || q.length < 2) return;
+    try{
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url);
+      if(!res.ok) return;
+      const data = await res.json();
+      data.forEach(item => {
+        const name = item.display_name;
+        cache.set(name, [parseFloat(item.lat), parseFloat(item.lon)]);
+        const div = document.createElement('div');
+        div.className = 'suggestion';
+        div.innerHTML = `<div>${name}</div><div class="small">lat:${item.lat} lon:${item.lon}</div>`;
+        div.addEventListener('click', () => {
+          if(container === startSug) startInput.value = name;
+          else endInput.value = name;
+          container.innerHTML = '';
+        });
+        container.appendChild(div);
+      });
+    }catch(err){ console.warn('suggest failed', err); }
+  }
+
+  // parse lat,lng typed directly
+  function parseLatLng(s){
+    if(!s) return null;
+    const parts = s.split(',').map(x=>x.trim());
+    if(parts.length < 2) return null;
+    const a = parseFloat(parts[0]), b = parseFloat(parts[1]);
+    if(Number.isFinite(a) && Number.isFinite(b)) return [a,b];
+    return null;
+  }
+
+  // score route using hazards (sample points)
+  function distanceMeters(a,b){
+    const R=6371000, toRad=x=>x*Math.PI/180;
+    const dLat = toRad(b[0]-a[0]), dLon=toRad(b[1]-a[1]);
+    const lat1=toRad(a[0]), lat2=toRad(b[0]);
+    const A = Math.sin(dLat/2)**2 + Math.sin(dLon/2)**2*Math.cos(lat1)*Math.cos(lat2);
+    const C = 2*Math.atan2(Math.sqrt(A), Math.sqrt(1-A));
+    return R*C;
+  }
+  function scorePolyline(latlngs){
+    let poth=0, crime=0, low=0;
+    for(const pt of latlngs){
+      for(const p of HAZARDS.potholes) if(distanceMeters(pt,p) < 30) poth++;
+      for(const z of HAZARDS.unsafeZones) if(distanceMeters(pt,[z.lat,z.lng]) < z.radius) crime++;
+    }
+    poth = Math.min(poth, HAZARDS.potholes.length);
+    crime = Math.min(crime, HAZARDS.unsafeZones.length);
+    const total = poth*1 + crime*10 + low*5;
+    return {poth,crime,low,total};
+  }
+
+  // get OSRM route (alternatives)
+  async function getOsrmRoutes(start, end){
+    const s = `${start[1]},${start[0]}`, e = `${end[1]},${end[0]}`;
+    const url = `${OSRM_BASE}/route/v1/driving/${s};${e}?overview=full&geometries=geojson&alternatives=true&steps=true`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('OSRM HTTP ' + r.status);
+    const j = await r.json();
+    return j.routes || [];
+  }
+
+  // Optional: ORS via your server proxy
+  async function getOrsRouteViaProxy(start, end){
+    // server should accept start/end and call ORS with your key
+    const res = await fetch(ORS_PROXY, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({start, end})
+    });
+    if(!res.ok) throw new Error('ORS proxy failed');
+    return await res.json(); // expects routes array
+  }
+
+  // fetch live overlays from server proxies (traffic/police)
+  async function fetchOverlays(){
+    // Clear existing
+    trafficLayerMarkers.forEach(m => map.removeLayer(m)); trafficLayerMarkers = [];
+    policeLayerMarkers.forEach(m => map.removeLayer(m)); policeLayerMarkers = [];
+
+    try{
+      const t = await fetch(TRAFFIC_PROXY); // server returns [{lat,lon,severity,desc}, ...]
+      if(t.ok){
+        const data = await t.json();
+        data.forEach(d => {
+          const m = L.marker([d.lat, d.lon], { title: d.desc, riseOnHover:true }).addTo(map)
+            .bindPopup(`<div class="traffic-marker">${d.severity || '⚠'} ${d.desc || ''}</div>`);
+          trafficLayerMarkers.push(m);
+        });
+      }
+    }catch(e){ console.warn('traffic overlay fetch failed', e); }
+
+    try{
+      const p = await fetch(POLICE_PROXY); // server returns [{lat,lon,type,desc}, ...]
+      if(p.ok){
+        const data = await p.json();
+        data.forEach(d => {
+          const m = L.marker([d.lat, d.lon], { title: d.desc }).addTo(map)
+            .bindPopup(`<div class="police-marker">${d.type || 'Police'} ${d.desc || ''}</div>`);
+          policeLayerMarkers.push(m);
+        });
+      }
+    }catch(e){ console.warn('police overlay fetch failed', e); }
+  }
+
+  // directions UI: show steps and allow clicking each step
+  let currentStepMarker = null;
+  function renderDirections(steps){
+    directionsDiv.innerHTML = '';
+    steps.forEach((st, idx) => {
+      const div = document.createElement('div');
+      div.className = 'step';
+      div.innerHTML = `<strong>${idx+1}.</strong> ${st.maneuver.instruction || st.name || ''} <div class="small"> ${ (st.distance/1000).toFixed(2)} km • ${(st.duration/60).toFixed(1)} min</div>`;
+      div.onclick = () => {
+        // highlight selected step
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        div.classList.add('active');
+        if(currentStepMarker) map.removeLayer(currentStepMarker);
+        const lat = st.maneuver.location[1], lon = st.maneuver.location[0];
+        currentStepMarker = L.circleMarker([lat,lon], { radius:8, color:'#111', fillColor:'#fff', weight:2 }).addTo(map);
+        map.panTo([lat,lon]);
+      };
+      directionsDiv.appendChild(div);
+    });
+  }
+
+  // compute and show distance matrix (simple: start->end route legs)
+  function showDistanceMatrix(routes){
+    // For OSRM single leg, distance/duration are in route.distance / route.duration. If multiple legs, use legs[]
+    if(!routes || routes.length === 0) { distanceMatrixDiv.innerText = 'No distance data'; return; }
+    const rows = [];
+    routes.forEach((rt, i) => {
+      const distKm = (rt.distance/1000).toFixed(2);
+      const durMin = (rt.duration/60).toFixed(1);
+      rows.push(`<div class="mb-1">Option ${i+1}: ${distKm} km • ${durMin} min</div>`);
+    });
+    distanceMatrixDiv.innerHTML = rows.join('');
+  }
+
+  // main compute function
+  async function computeRoutes(isSos = false){
+    clearRoutes();
+    directionsDiv.innerHTML = 'Processing...';
+    const startText = startInput.value.trim();
+    const endText = endInput.value.trim();
+    if(!endText) { showModal('Input missing', 'Please enter destination'); directionsDiv.innerHTML = 'No directions'; return; }
+
+    // Resolve start & end
+    let startCoord = parseLatLng(startText);
+    if(!startCoord && cache.has(startText)) startCoord = cache.get(startText);
+    if(!startCoord && startText) {
+      const g = await geocodeOne(startText);
+      if(g) startCoord = [g[0], g[1]];
+    }
+    // default start if still no start
+    if(!startCoord) startCoord = [17.400, 78.470];
+
+    let endCoord = parseLatLng(endText);
+    if(!endCoord && cache.has(endText)) endCoord = cache.get(endText);
+    if(!endCoord && endText) {
+      const g = await geocodeOne(endText);
+      if(g) endCoord = [g[0], g[1]];
+    }
+    if(!endCoord){ showModal('Geocode', 'Could not geocode destination. Try selecting a suggestion.'); directionsDiv.innerHTML = 'No directions'; return; }
+
+    // overlay live layers
+    fetchOverlays();
+
+    // Choose router
+    const provider = routerSelect.value;
+    let routes = [];
+    try{
+      if(provider === 'osrm') routes = await getOsrmRoutes(startCoord, endCoord);
+      else {
+        // ORS via proxy on server
+        const res = await fetch(ORS_PROXY, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({start:startCoord, end:endCoord})});
+        if(!res.ok) throw new Error('ORS proxy failed');
+        const json = await res.json();
+        routes = json.routes || [];
+      }
+    }catch(err){
+      console.error('route fetch failed', err);
+      showModal('Routing error', 'Could not fetch routes. See console.');
+      directionsDiv.innerHTML = 'No directions';
+      return;
+    }
+
+    if(!routes || routes.length === 0) { showModal('Routing', 'No routes returned'); directionsDiv.innerHTML = 'No directions'; return; }
+
+    // Score each route
+    const scored = routes.map((rt, idx) => {
+      const coords = rt.geometry.coordinates || [];
+      const latlngs = coords.map(c => [c[1], c[0]]);
+      const sample = latlngs.filter((_,i) => i % Math.max(1, Math.floor(latlngs.length / 200)) === 0);
+      const score = scorePolyline(sample);
+      return { idx, rt, latlngs, score, duration: Math.round(rt.duration/60) + ' min', distance: Math.round(rt.distance/1000) + ' km' };
+    });
+
+    // pick fastest & safest
+    const fastest = scored.reduce((best, cur) => {
+      if(!best) return cur;
+      const bd = parseFloat(best.duration) || 9999;
+      const cd = parseFloat(cur.duration) || 9999;
+      return (parseFloat(cur.rt.duration) < parseFloat(best.rt.duration)) ? cur : best;
+    }, null);
+
+    const safest = scored.reduce((best, cur) => {
+      if(!best) return cur;
+      const bs = best.score.total || 9999;
+      const cs = cur.score.total || 9999;
+      return cs < bs ? cur : best;
+    }, null);
+
+    const recommended = isSos ? safest : ((safest && fastest && safest.score.total <= fastest.score.total) ? safest : fastest);
+
+    // draw both (recommended highlighted)
+    if(fastest && fastest.latlngs.length) drawRoute(fastest.latlngs, 'red', {});
+    if(safest && safest.latlngs.length) drawRoute(safest.latlngs, 'green', { opacity: 0.75 });
+
+    // also draw chosen recommended (thicker)
+    clearRoutes(); // clear simple ones, then draw again with recommended emphasis
+    // draw non-recommended faded
+    scored.forEach(s => {
+      if(recommended && s.idx === recommended.idx) return;
+      drawRoute(s.latlngs, (s === fastest ? 'red' : 'green'), { opacity: 0.25 });
+    });
+    // draw recommended prominently
+    drawRoute(recommended.latlngs, (recommended === fastest ? 'red' : 'green'), { opacity: 1.0 });
+
+    // fit map
+    if(routeLayers.length) {
+      try { map.fitBounds(L.featureGroup(routeLayers).getBounds(), { padding:[40,40] }); }
+      catch(e){ console.warn('fitBounds failed', e); }
+    }
+
+    // Show distance matrix (simple)
+    showDistanceMatrix(scored.map(s => s.rt || s));
+
+    // show route details UI
+    if(fastest) routeA_details.innerHTML = `Score: ${fastest.score.total} | Time: ${fastest.duration} | Dist: ${fastest.distance} <br> potholes:${fastest.score.poth} crimeZones:${fastest.score.crime}`;
+    if(safest) routeB_details.innerHTML = `Score: ${safest.score.total} | Time: ${safest.duration} | Dist: ${safest.distance} <br> potholes:${safest.score.poth} crimeZones:${safest.score.crime}`;
+
+    // turn-by-turn: pick the recommended route 'rt' and flatten steps
+    const chosen = recommended.rt;
+    const steps = [];
+    if(chosen && chosen.legs && chosen.legs.length){
+      // combine steps across legs
+      chosen.legs.forEach(leg => leg.steps.forEach(step => steps.push(step)));
+    }
+    if(steps.length) {
+      renderDirections(steps);
+    } else {
+      directionsDiv.innerHTML = 'No step-by-step available for this route.';
+    }
+
+    // save recents
+    if(startInput.value) saveRecent(startInput.value);
+    if(endInput.value) saveRecent(endInput.value);
+
+    showModal('Recommendation', `Recommended: <strong>${recommended === safest ? 'Safest Route (Route B)' : 'Fastest Route (Route A)'}</strong>`);
+  }
+
+  // helper to show directions
+  function renderDirections(steps){
+    directionsDiv.innerHTML = '';
+    steps.forEach((st, idx) => {
+      const div = document.createElement('div');
+      div.className = 'step';
+      div.innerHTML = `<strong>${idx+1}.</strong> ${st.name || ''} ${st.maneuver && st.maneuver.instruction ? ' — ' + st.maneuver.instruction : ''} <div class="small">${(st.distance/1000).toFixed(2)} km • ${(st.duration/60).toFixed(1)} min</div>`;
+      div.addEventListener('click', () => {
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        div.classList.add('active');
+        const lat = st.maneuver.location[1], lon = st.maneuver.location[0];
+        L.circleMarker([lat,lon], { radius:8, color:'#111', fillColor:'#fff', weight:2 }).addTo(map).bindPopup(st.maneuver.instruction || st.name).openPopup();
+        map.panTo([lat,lon]);
+      });
+      directionsDiv.appendChild(div);
+    });
+  }
+
+  // distance matrix UI simple
+  function showDistanceMatrix(routes){
+    if(!routes || routes.length === 0) { distanceMatrixDiv.innerText = 'No distance data'; return; }
+    const rows = routes.map((rt,i) => {
+      const dkm = (rt.distance/1000).toFixed(2);
+      const dmin = (rt.duration/60).toFixed(1);
+      return `<div class="mb-1">Option ${i+1}: <strong>${dkm} km</strong> • ${dmin} min</div>`;
+    });
+    distanceMatrixDiv.innerHTML = rows.join('');
+  }
+
+  // save/load recent
+  function saveRecent(s){
+    if(!s) return;
+    let arr = JSON.parse(localStorage.getItem('sr_recent') || '[]');
+    if(arr[0] !== s) arr.unshift(s);
+    arr = arr.slice(0,6);
+    localStorage.setItem('sr_recent', JSON.stringify(arr));
+    loadRecent();
+  }
+  function loadRecent(){
+    recentBox.innerHTML = '';
+    const arr = JSON.parse(localStorage.getItem('sr_recent') || '[]');
+    arr.forEach(it => {
+      const d = document.createElement('div'); d.className = 'suggestion'; d.textContent = it;
+      d.onclick = () => { startInput.value = it; };
+      recentBox.appendChild(d);
+    });
+  }
+  loadRecent();
+
+  // image analysis - low-light hint
+  if(placeImage){
+    placeImage.addEventListener('change', async (ev) => {
+      const file = ev.target.files[0]; if(!file) return;
+      const url = URL.createObjectURL(file);
+      const img = new Image(); img.src = url; await img.decode();
+      imagePreview.innerHTML = `<img src="${url}" class="rounded w-full" />`;
+      const canvas = document.createElement('canvas'); canvas.width = Math.min(800, img.naturalWidth); canvas.height = Math.min(600, img.naturalHeight);
+      const ctx = canvas.getContext('2d'); ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+      let total=0, cnt=0; for(let i=0;i<data.length;i+=4){ const r=data[i], g=data[i+1], b=data[i+2]; total += 0.2126*r + 0.7152*g + 0.0722*b; cnt++; }
+      const avg = total/cnt;
+      if(avg < 80){
+        // attempt to geocode end and add small low-light hazard
+        const ec = await (async ()=> {
+          const parsed = parseLatLng(endInput.value); if(parsed) return parsed;
+          const cached = cache.get(endInput.value); if(cached) return cached;
+          const g = await geocodeOne(endInput.value); return g ? [g[0], g[1]] : null;
+        })();
+        if(ec) {
+          HAZARDS.unsafeZones.push({lat:ec[0], lng:ec[1], weight: 5, radius: 120});
+          showModal('Image Analysis','Low brightness detected — added low-light hazard at destination for scoring.');
+        } else {
+          showModal('Image Analysis','Low brightness detected — but destination not resolved; select destination to attach hint.');
+        }
+      } else {
+        showModal('Image Analysis','Image looks well-lit — no low-light hazard added.');
+      }
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  // overlay refresh button (implicitly run on find)
+  async function refreshOverlays(){
+    try{ await fetchOverlays(); } catch(e){ console.warn('overlay refresh failed', e); }
+  }
+
+  // wire events
+  findBtn.addEventListener('click', ()=> computeRoutes(false));
+  toggleSos.addEventListener('click', ()=> {
+    const active = sosStatus.textContent === 'ACTIVE';
+    sosStatus.textContent = active ? 'INACTIVE' : 'ACTIVE';
+    sosStatus.style.color = active ? 'red' : 'green';
+    computeRoutes(!active);
+  });
+  routeA_info.addEventListener('click', ()=> { routeA_info.classList.toggle('highlight'); routeB_info.classList.remove('highlight'); });
+  routeB_info.addEventListener('click', ()=> { routeB_info.classList.toggle('highlight'); routeA_info.classList.remove('highlight'); });
+
+  // allow clicking map to set destination
+  map.on('click', async (e) => {
+    const lat = e.latlng.lat, lon = e.latlng.lng;
+    try{
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+      if(r.ok){ const j = await r.json(); const name = j.display_name || `${lat.toFixed(6)}, ${lon.toFixed(6)}`; endInput.value = name; cache.set(name, [lat, lon]); showModal('Map click','Destination set to: ' + name); }
+      else { endInput.value = `${lat.toFixed(6)}, ${lon.toFixed(6)}`; cache.set(endInput.value, [lat, lon]); showModal('Map click','Destination set to coordinates'); }
+    }catch(err){ console.warn('reverse failed', err); endInput.value = `${lat.toFixed(6)}, ${lon.toFixed(6)}`; cache.set(endInput.value, [lat, lon]); showModal('Map click','Destination set to coordinates'); }
+  });
+
+  // voice input for start
+  if(window.SpeechRecognition || window.webkitSpeechRecognition){
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recog = new SpeechRecognition(); recog.lang='en-IN'; recog.continuous=false; recog.interimResults=false;
+    voiceStart.addEventListener('click', ()=> { try{ recog.start(); } catch(e) {} });
+    recog.onresult = (ev) => { startInput.value = ev.results[0][0].transcript; };
+    recog.onerror = (e) => console.warn('speech error', e);
+  } else {
+    voiceStart.style.opacity = 0.4;
+    voiceStart.title = 'Speech not supported';
+  }
+
+  // gps for start
+  gpsStart.addEventListener('click', ()=> {
+    if(!navigator.geolocation) { showModal('GPS', 'Geolocation not available'); return; }
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      try{
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+        const j = await r.json();
+        const name = j.display_name || `${lat}, ${lon}`;
+        startInput.value = name;
+        cache.set(name, [lat, lon]);
+      }catch(e){ startInput.value = `${lat}, ${lon}`; cache.set(startInput.value, [lat, lon]); }
+    }, (err) => showModal('GPS error', err.message));
+  });
+
+  // initial overlays refresh
+  refreshOverlays();
+
+}); // DOM ready
+</script>
+</body>
+</html>
