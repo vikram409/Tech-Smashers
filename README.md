@@ -1,6 +1,5 @@
 # Tech-Smashers
-road quality index with safety(Squareroots.ai)
-
+road quality index with safety journy .
 Problem Statement
 The Safe Journey System is an integrated AI solution designed to ensure safer travel using real-time monitoring, road-quality insights, women safety features, safe route navigation, and deepfake-based driver verification. Built for hackathons and real-world deployment, this project combines computer vision, geospatial analysis, and AI-driven decision-making.
 
