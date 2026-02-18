@@ -20,12 +20,11 @@ Fastest Route (Red)
 Safest Route (Green)
 This helps users make safer travel decisions.
 
-Phase 4 – Deepfake Driver & Vehicle Verification(Squareroots.ai)
-
+Phase 4 – Deepfake Driver & Vehicle Verification
 Before entering a cab or ride, users can scan the driver’s face or ID card. A deepfake detection model analyzes facial patterns to verify authenticity and detect manipulated images. This prevents fake driver identity fraud and enhances passenger safety.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
-Phase 1 – Automatic Road Damage Detection(Squareroots.ai)
+Phase 1 – Automatic Road Damage Detection
 
 Phase 1 focuses on developing an AI system that automatically detects potholes, cracks, and missing lane markings from images submitted by vehicles or crowdsourced users. The aim is to speed up road inspection, reduce manual work, and help authorities fix damages faster. Using a trained YOLOv11s model, each uploaded road image is analyzed and labeled with the type of defect found. The system highlights the damage with bounding boxes and confidence scores, making it easy to understand what issues are present.
 
@@ -101,7 +100,7 @@ Encourages authorities to maintain frequently marked unsafe areas
 This phase makes navigation smarter by combining mobility, safety, and real-time environmental insights.
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-Phase 4 – Deepfake Driver & Vehicle Verification(Squareroots.ai)
+Phase 4 – Deepfake Driver & Vehicle Verification
 
 Phase 4 focuses on ensuring safe and trusted travel by verifying the driver’s identity and vehicle authenticity using deepfake detection technology. Before entering a cab or ride, users can simply scan the driver’s face, ID card, or vehicle information through the app. The system then analyzes the input using a trained deepfake detection model that checks for abnormal facial patterns, inconsistencies, or digital manipulation. This helps identify whether the driver is genuine or if the image has been tampered with.
 
